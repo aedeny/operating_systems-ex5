@@ -59,4 +59,5 @@ int main() {
     }
   }
   close(my_pipe[1]);
+  kill(child_pid, SIGKILL);
 }
