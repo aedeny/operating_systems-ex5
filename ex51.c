@@ -59,7 +59,7 @@ int execute_game(int pipe[2]) {
       handle_failure(ERROR_MSG, pipe);
       return FAILURE;
     }
-    if (dup2(pipe[0], STDIN_FILENO) == -1) {
+    if (dup2(pipe[0], STDIN_FILENO) == FAILURE) {
       handle_failure(ERROR_MSG, pipe);
       return FAILURE;
     }
@@ -78,11 +78,10 @@ int main() {
   }
 
   int child_pid;
-  if ((child_pid = execute_game(my_pipe) == FAILURE) {
+  if ((child_pid = execute_game(my_pipe)) == FAILURE) {
     handle_failure(ERROR_MSG, my_pipe);
     exit(1);
   }
-  // TODO add checks
   char pressed_key;
   while (1) {
     pressed_key = get_char();
@@ -93,7 +92,7 @@ int main() {
     if (kill(child_pid, SIGUSR2) == FAILURE) {
       handle_failure(ERROR_MSG, my_pipe);
       exit(1);
-    };
+    }
     if (pressed_key == QUIT_KEY) {
       break;
     }
