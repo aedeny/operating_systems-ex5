@@ -12,11 +12,13 @@
 #define ERROR_MSG "Error"
 
 enum boolean {
-  FAIL = -1,
+  FAILURE = -1,
   SUCCESS
 };
 
-void writeError(char *message) {
+void handle_failure(char *message, int *pipe_to_close) {
+  close(pipe_to_close[0]);
+  close(pipe_to_close[1]);
   write(STDERR_FILENO, message, sizeof(message));
 }
 
@@ -43,8 +45,8 @@ char get_char() {
 int execute_game(int pipe[2]) {
   pid_t pid;
   if ((pid = fork()) == -1) {
-    writeError(ERROR_MSG);
-    return FAIL;
+    handle_failure(ERROR_MSG, pipe);
+    return FAILURE;
   }
 
   if (pid > 0) {
@@ -54,16 +56,17 @@ int execute_game(int pipe[2]) {
   } else {
     // Child
     if (close(pipe[1]) == -1) {
-      writeError(ERROR_MSG);
-      return FAIL;
+      handle_failure(ERROR_MSG, pipe);
+      return FAILURE;
     }
-    if(dup2(pipe[0], STDIN_FILENO) == -1){
-      writeError(ERROR_MSG);
-      return FAIL;
+    if (dup2(pipe[0], STDIN_FILENO) == -1) {
+      handle_failure(ERROR_MSG, pipe);
+      return FAILURE;
     }
     char *argv[] = {"./draw.out", NULL};
     execvp(argv[0], argv);
-    return FAIL;
+    handle_failure(ERROR_MSG, pipe);
+    return FAILURE;
   }
 }
 
@@ -75,22 +78,32 @@ int main() {
   }
 
   int child_pid;
-  if ((child_pid= execute_game(my_pipe)==FAIL){
-    close(my_pipe[0]);
-    close(my_pipe[1]);
-    writeError(ERROR_MSG);
+  if ((child_pid = execute_game(my_pipe) == FAILURE) {
+    handle_failure(ERROR_MSG, my_pipe);
     exit(1);
   }
   // TODO add checks
   char pressed_key;
   while (1) {
     pressed_key = get_char();
-    write(my_pipe[1], &pressed_key, sizeof(char));
-    kill(child_pid, SIGUSR2);
+    if (write(my_pipe[1], &pressed_key, sizeof(char)) == FAILURE) {
+      handle_failure(ERROR_MSG, my_pipe);
+      exit(1);
+    }
+    if (kill(child_pid, SIGUSR2) == FAILURE) {
+      handle_failure(ERROR_MSG, my_pipe);
+      exit(1);
+    };
     if (pressed_key == QUIT_KEY) {
       break;
     }
   }
-  close(my_pipe[1]);
-  kill(child_pid, SIGKILL);
+  if (close(my_pipe[1]) == FAILURE) {
+    write(STDERR_FILENO, ERROR_MSG, sizeof(ERROR_MSG));
+    exit(1);
+  }
+  if (kill(child_pid, SIGKILL) == FAILURE) {
+    write(STDERR_FILENO, ERROR_MSG, sizeof(ERROR_MSG));
+    exit(1);
+  }
 }

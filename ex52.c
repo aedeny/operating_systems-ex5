@@ -8,6 +8,7 @@
 #define INIT_Y 1
 #define BOARD_HEIGHT 20
 #define BOARD_WIDTH 20
+#define ERROR_MSG "Error"
 
 // Keys
 #define QUIT_KEY 'q'
@@ -99,7 +100,10 @@ void handle_key(char key) {
 
 void handle_key_signal() {
   char key = 0;
-  scanf("%c", &key);
+  if (scanf("%c", &key) == EOF) {
+    write(STDERR_FILENO, ERROR_MSG, sizeof(ERROR_MSG));
+    exit(1);
+  }
   if (key == QUIT_KEY) {
     exit(0);
   }
