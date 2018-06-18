@@ -2,12 +2,23 @@
 #include <termios.h>
 #include <stdio.h>
 #include <signal.h>
+#include <stdlib.h>
 
 #define QUIT_KEY 'q'
 #define CHANGE_ORIENTATION_KEY 'w'
 #define MOVE_LEFT_KEY 'a'
 #define MOVE_RIGHT_KEY 'd'
 #define MOVE_DOWN_KEY 's'
+#define ERROR_MSG "Error"
+
+enum boolean {
+  FAIL = -1,
+  SUCCESS
+};
+
+void writeError(char *message) {
+  write(STDERR_FILENO, message, sizeof(message));
+}
 
 char get_char() {
   char buf = 0;
@@ -30,25 +41,47 @@ char get_char() {
 }
 
 int execute_game(int pipe[2]) {
-  pid_t pid = fork();
+  pid_t pid;
+  if ((pid = fork()) == -1) {
+    writeError(ERROR_MSG);
+    return FAIL;
+  }
+
   if (pid > 0) {
     // Father
     close(pipe[0]);
     return pid;
   } else {
     // Child
-    close(pipe[1]);
-    dup2(pipe[0], STDIN_FILENO);
+    if (close(pipe[1]) == -1) {
+      writeError(ERROR_MSG);
+      return FAIL;
+    }
+    if(dup2(pipe[0], STDIN_FILENO) == -1){
+      writeError(ERROR_MSG);
+      return FAIL;
+    }
     char *argv[] = {"./draw.out", NULL};
     execvp(argv[0], argv);
+    return FAIL;
   }
 }
 
 int main() {
   int my_pipe[2];
-  pipe(my_pipe);
+  if (pipe(my_pipe) == -1) {
+    write(STDERR_FILENO, ERROR_MSG, sizeof(ERROR_MSG));
+    exit(1);
+  }
 
-  int child_pid = execute_game(my_pipe);
+  int child_pid;
+  if ((child_pid= execute_game(my_pipe)==FAIL){
+    close(my_pipe[0]);
+    close(my_pipe[1]);
+    writeError(ERROR_MSG);
+    exit(1);
+  }
+  // TODO add checks
   char pressed_key;
   while (1) {
     pressed_key = get_char();
